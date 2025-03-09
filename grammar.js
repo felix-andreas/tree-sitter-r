@@ -68,10 +68,9 @@
 // ---------------------------------------------------------------------------------------
 
 const PREC = {
-  // #
   // NOTE: If we don't put comments at a negative rank, then `"#"` will treat the `#` as
   // the start of a comment rather than being part of the string.
-  COMMENT: { ASSOC: prec, RANK: -1},
+  COMMENT: { ASSOC: prec, RANK: -1 },
 
   // {, (
   // NOTE: If we understand correctly, brace and parenthesis blocks are given the same
@@ -149,7 +148,7 @@ const PREC = {
 
   // $, @
   // NOTE: See `NOTE ON PREC.RIGHT` above
-  EXTRACT: { ASSOC: prec.right, RANK: 18 },
+  EXTRACT: { ASSOC: prec.right, RANK: -18 },
 
   // ::, :::
   // NOTE: See `NOTE ON PREC.RIGHT` above
@@ -204,10 +203,15 @@ module.exports = grammar({
   rules: {
     // Top-level rules.
     // The zero width `$._start` ensures that `program` starts at `(0, 0)`.
-    program: $ => seq(
-        $._start,
-        repeat(choice($._expression, $._semicolon, $._newline))
-    ),
+    // program: $ => seq(
+    //   $._start,
+    //   repeat(choice($._expression, $._semicolon, $._newline))
+    // ),
+    // TRY: PROGRAM
+    program: $ => withPrec(PREC.BLOCK, seq(
+      $._start,
+      repeat(choice($._expression, $._semicolon, $._newline))
+    )),
 
     // Function definitions.
     function_definition: $ => withPrec(PREC.FUNCTION_OR_LOOP, seq(
@@ -453,19 +457,22 @@ module.exports = grammar({
     },
 
     // NOTE: Expression on LHS, string/identifier/dots/dot_dot_i on RHS
-    extract_operator: $ => {
-      const table = [
-        ["$", PREC.EXTRACT],
-        ["@", PREC.EXTRACT]
-      ];
-
-      return choice(...table.map(([operator, prec]) => prec.ASSOC(prec.RANK, seq(
-        field("lhs", $._expression),
-        field("operator", operator),
-        repeat($._newline),
-        optional(field("rhs", $._string_or_identifier_or_dots_or_dot_dot_i))
-      ))))
-    },
+    extract_operator: $ => withPrec(PREC.EXTRACT,
+      choice(
+        seq(
+          field("lhs", $._expression),
+          field("operator", choice("$", "@")),
+        ),
+        seq(
+          field("lhs", $._expression),
+          field("operator", choice("$", "@")),
+          optional(seq(
+            repeat($._newline),
+            optional(field("rhs", $.identifier))
+          ))
+        )
+      )
+    ),
 
     // NOTE: No newlines are allowed. String/identifier/dots/dot_dot_i on both LHS and RHS.
     namespace_operator: $ => {

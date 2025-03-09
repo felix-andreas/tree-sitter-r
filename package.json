@@ -40,7 +40,7 @@
   "scripts": {
     "install": "node-gyp-build",
     "prestart": "tree-sitter build --wasm",
-    "start": "tree-sitter playground",
+    "start": "tree-sitter playground -q",
     "test": "node --test bindings/node/*_test.js"
   },
   "tree-sitter": [

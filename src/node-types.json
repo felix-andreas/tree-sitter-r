@@ -1035,19 +1035,7 @@
         "required": false,
         "types": [
           {
-            "type": "dot_dot_i",
-            "named": true
-          },
-          {
-            "type": "dots",
-            "named": true
-          },
-          {
             "type": "identifier",
-            "named": true
-          },
-          {
-            "type": "string",
             "named": true
           }
         ]
@@ -2340,6 +2328,7 @@
   {
     "type": "program",
     "named": true,
+    "root": true,
     "fields": {},
     "children": {
       "multiple": true,
