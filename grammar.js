@@ -71,7 +71,7 @@ const PREC = {
   // #
   // NOTE: If we don't put comments at a negative rank, then `"#"` will treat the `#` as
   // the start of a comment rather than being part of the string.
-  COMMENT: { ASSOC: prec, RANK: -1},
+  COMMENT: { ASSOC: prec, RANK: -1 },
 
   // {, (
   // NOTE: If we understand correctly, brace and parenthesis blocks are given the same
@@ -205,8 +205,8 @@ module.exports = grammar({
     // Top-level rules.
     // The zero width `$._start` ensures that `program` starts at `(0, 0)`.
     program: $ => seq(
-        $._start,
-        repeat(choice($._expression, $._semicolon, $._newline))
+      $._start,
+      repeat(choice($._expression, $._semicolon, $._newline))
     ),
 
     // Function definitions.
@@ -383,14 +383,13 @@ module.exports = grammar({
     // NOTE: Newlines are allowed after all unary operators
     unary_operator: $ => {
       const table = [
-        ["?", PREC.HELP],
-        ["~", PREC.TILDE],
-        ["!", PREC.UNARY_NOT],
-        ["+", PREC.UNARY_PLUS_MINUS],
-        ["-", PREC.UNARY_PLUS_MINUS]
+        [PREC.HELP, "?"],
+        [PREC.TILDE, "~"],
+        [PREC.UNARY_NOT, "!"],
+        [PREC.UNARY_PLUS_MINUS, choice("+", "-")]
       ];
 
-      return choice(...table.map(([operator, prec]) => prec.ASSOC(prec.RANK, seq(
+      return choice(...table.map(([precedence, operator]) => precedence.ASSOC(precedence.RANK, seq(
         field("operator", operator),
         repeat($._newline),
         field("rhs", $._expression)
@@ -400,51 +399,22 @@ module.exports = grammar({
     // NOTE: Expressions are allowed on either side of the operator
     binary_operator: $ => {
       const table = [
-        ["?", PREC.HELP],
-
-        ["~", PREC.TILDE],
-
-        ["<-", PREC.LEFT_ASSIGN],
-        ["<<-", PREC.LEFT_ASSIGN],
-        [":=", PREC.LEFT_ASSIGN],
-
-        ["->", PREC.RIGHT_ASSIGN],
-        ["->>", PREC.RIGHT_ASSIGN],
-
-        ["=", PREC.EQUALS_ASSIGN],
-
-        ["|", PREC.OR],
-        ["&", PREC.AND],
-
-        ["||", PREC.OR],
-        ["&&", PREC.AND],
-
-        ["<", PREC.COMPARISON],
-        ["<=", PREC.COMPARISON],
-        [">", PREC.COMPARISON],
-        [">=", PREC.COMPARISON],
-        ["==", PREC.COMPARISON],
-        ["!=", PREC.COMPARISON],
-
-        ["+", PREC.PLUS_MINUS],
-        ["-", PREC.PLUS_MINUS],
-        ["*", PREC.MULTIPLY_DIVIDE],
-        ["/", PREC.MULTIPLY_DIVIDE],
-        ["**", PREC.EXPONENTIATE],
-        ["^", PREC.EXPONENTIATE],
-
-        // Special infix operator
-        // Regex: Between two `%`, anything but another `%`, `\`, or `\n`.
-        // Includes primitives `%%` and `%/%`.
-        // Alias is used for targeting in `highlights.scm`.
-        // TODO: This could probably be fine tuned to disallow more things.
-        [alias(/%[^%\\\n]*%/, "special"), PREC.SPECIAL_OR_PIPE],
-        ["|>", PREC.SPECIAL_OR_PIPE],
-
-        [":", PREC.COLON]
+        [PREC.HELP, "?"],
+        [PREC.TILDE, "~"],
+        [PREC.LEFT_ASSIGN, choice("<-", "<<-", ":=")],
+        [PREC.EQUALS_ASSIGN, "="],
+        [PREC.RIGHT_ASSIGN, choice("->", "->>")],
+        [PREC.OR, choice("|", "||")],
+        [PREC.AND, choice("&", "&&")],
+        [PREC.COMPARISON, choice("<", "<=", ">", ">=", "==", "!=")],
+        [PREC.PLUS_MINUS, choice("+", "-")],
+        [PREC.MULTIPLY_DIVIDE, choice("*", "/")],
+        [PREC.EXPONENTIATE, choice("**", "^")],
+        [PREC.SPECIAL_OR_PIPE, choice(alias(/%[^%\\\n]*%/, "special"), "|>")],
+        [PREC.COLON, ":"],
       ];
 
-      return choice(...table.map(([operator, prec]) => prec.ASSOC(prec.RANK, seq(
+      return choice(...table.map(([precedence, operator]) => precedence.ASSOC(precedence.RANK, seq(
         field("lhs", $._expression),
         field("operator", operator),
         repeat($._newline),
@@ -453,33 +423,19 @@ module.exports = grammar({
     },
 
     // NOTE: Expression on LHS, string/identifier/dots/dot_dot_i on RHS
-    extract_operator: $ => {
-      const table = [
-        ["$", PREC.EXTRACT],
-        ["@", PREC.EXTRACT]
-      ];
-
-      return choice(...table.map(([operator, prec]) => prec.ASSOC(prec.RANK, seq(
-        field("lhs", $._expression),
-        field("operator", operator),
-        repeat($._newline),
-        optional(field("rhs", $._string_or_identifier_or_dots_or_dot_dot_i))
-      ))))
-    },
+    extract_operator: $ => withPrec(PREC.EXTRACT, seq(
+      field("lhs", $._expression),
+      field("operator", choice("$", "@")),
+      repeat($._newline),
+      optional(field("rhs", $._string_or_identifier_or_dots_or_dot_dot_i))
+    )),
 
     // NOTE: No newlines are allowed. String/identifier/dots/dot_dot_i on both LHS and RHS.
-    namespace_operator: $ => {
-      const table = [
-        ["::", PREC.NAMESPACE],
-        [":::", PREC.NAMESPACE]
-      ];
-
-      return choice(...table.map(([operator, prec]) => prec.ASSOC(prec.RANK, seq(
-        field("lhs", $._string_or_identifier_or_dots_or_dot_dot_i),
-        field("operator", operator),
-        optional(field("rhs", $._string_or_identifier_or_dots_or_dot_dot_i))
-      ))))
-    },
+    namespace_operator: $ => withPrec(PREC.NAMESPACE, seq(
+      field("lhs", $._string_or_identifier_or_dots_or_dot_dot_i),
+      field("operator", choice("::", ":::")),
+      optional(field("rhs", $._string_or_identifier_or_dots_or_dot_dot_i))
+    )),
 
     // Numeric literals.
     integer: $ => seq($._float_literal, "L"),
